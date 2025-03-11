@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 st.set_page_config(
-    page_title="Pump Flow Rate Calculator Reka",
+    page_title="Pump Flow Rate Calculator",
     page_icon="💧",
     layout="wide"
 )
@@ -29,7 +29,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown("<h1 class='main-header'>Pump Flow Rate Calculator</h1>", unsafe_allow_html=True)
+st.markdown("<h1 class='main-header'>Pump Flow Rate Calculator Web App</h1>", unsafe_allow_html=True)
 st.markdown("<p class='info-text'>This application simulates pump flow rate decline over time considering periodic overhauls and operational factors.</p>", unsafe_allow_html=True)
 
 # Function to calculate flow rate decline over time with periodic overhaul and operational factors

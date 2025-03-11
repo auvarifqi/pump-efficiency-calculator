@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 st.set_page_config(
-    page_title="Pump Flow Rate Calculator",
+    page_title="Pump Flow Rate Calculator Reka",
     page_icon="💧",
     layout="wide"
 )

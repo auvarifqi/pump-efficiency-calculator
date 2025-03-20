@@ -4,237 +4,236 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 st.set_page_config(
-    page_title="Pump Flow Rate Calculator",
-    page_icon="💧",
+    page_title="Wip Performance Calculator",
+    page_icon="🔄",
     layout="wide"
 )
 
-# Add custom CSS for better styling
+# Title and description
+st.title("Wip Performance Calculator")
 st.markdown("""
-<style>
-    .main-header {
-        font-size: 2.5rem;
-        color: #1E88E5;
-        text-align: center;
-    }
-    .sub-header {
-        font-size: 1.5rem;
-        color: #0D47A1;
-    }
-    .info-text {
-        background-color: #0D47A1;
-        padding: 15px;
-        border-radius: 5px;
-    }
-</style>
-""", unsafe_allow_html=True)
+This application simulates pump efficiency decline over time with periodic overhauls triggered by threshold.
+Enter your parameters in the sidebar and view the results.
+""")
 
-st.markdown("<h1 class='main-header'>Pump Flow Rate Calculator Web App</h1>", unsafe_allow_html=True)
-st.markdown("<p class='info-text'>This application simulates pump flow rate decline over time considering periodic overhauls and operational factors.</p>", unsafe_allow_html=True)
-
-# Function to calculate flow rate decline over time with periodic overhaul and operational factors
-def calculate_flow_rate(years, initial_flow_rate, overhaul_drop, overhaul_interval, particle_concentration, ph):
+# Function to calculate efficiency decline over time with overhaul triggered by threshold
+def calculate_efficiency_with_threshold(years, initial_efficiency, bep_ratio_drop, threshold, 
+                                       particle_concentration, ph, chloride_concentration, 
+                                       input_pressure, output_pressure, flow_rate):
     """
-    Simulates pump flow rate decline over time with periodic overhaul and operational parameters.
-    
+    Simulates pump efficiency decline over time with periodic overhaul triggered by threshold.
+
     Args:
         years (int): Total years to simulate.
-        initial_flow_rate (float): Initial flow rate of the pump (usgpm).
-        overhaul_drop (float): Flow rate drop after each overhaul (%).
-        overhaul_interval (int): Number of years between overhauls.
+        initial_efficiency (float): Initial efficiency of the pump (%).
+        bep_ratio_drop (float): BEP ratio drop after each overhaul (%).
+        threshold (float): Efficiency threshold for triggering overhaul (%).
         particle_concentration (float): Sand particle concentration in fluid (%).
         ph (float): Average pH of fluid.
-    
+        chloride_concentration (float): Chloride concentration in ppm.
+        input_pressure (float): Input pressure of the pump (psig).
+        output_pressure (float): Output pressure of the pump (psig).
+        flow_rate (float): Flow rate of the pump (usgpm).
+
     Returns:
-        list: Flow rate values over the years.
+        list: Efficiency values over the years.
+        list: Yearly efficiency drops.
+        int: Year when pump should be replaced.
     """
-    flow_rate = []
-    current_flow_rate = initial_flow_rate
-    
+    efficiency = []
+    yearly_drops = []
+    current_efficiency = initial_efficiency
+    original_efficiency = initial_efficiency
+    replace_year = None
+
     # Parameters affecting efficiency decline
-    particle_factor = particle_concentration * 0.005  # Effect of sand particles
-    ph_factor = abs(7 - ph) * 0.01  # Effect of pH deviation from neutral
-    
+    particle_factor = particle_concentration * 0.005
+    ph_factor = abs(7 - ph) * 0.01
+    chloride_factor = chloride_concentration * 0.001
+    pressure_factor = abs(input_pressure - output_pressure) * 0.0005
+    flow_factor = flow_rate * 0.0001
+
     for year in range(1, years + 1):
-        flow_rate.append(current_flow_rate)
-        
-        # Check if it's time for an overhaul
-        if year % overhaul_interval == 0:
-            current_flow_rate *= (1 - overhaul_drop / 100)  # Reduce flow rate by overhaul drop percentage
-        
-        # Apply additional operational factors (non-linear decay)
-        decay_rate = particle_factor + ph_factor
-        current_flow_rate *= np.exp(-decay_rate)  # Exponential decay due to operational factors
-    
-    return flow_rate
+        if current_efficiency <= threshold:
+            post_overhaul_efficiency = original_efficiency * (1 - bep_ratio_drop / 100)
+            if post_overhaul_efficiency < 50:
+                replace_year = year
+                break
+            current_efficiency = post_overhaul_efficiency
+            original_efficiency = current_efficiency
+
+        efficiency.append(current_efficiency)
+
+        # Adjust decay rate dynamically based on operational parameters
+        base_factor = 0.10  # Adjusted base factor to target 9-11% range
+        decay_factor = base_factor + particle_factor + ph_factor + chloride_factor + pressure_factor + flow_factor
+
+        # Calculate percentage drop (between 9-11%)
+        percent_drop = max(9.0, min(11.0, decay_factor * 100))
+
+        # Calculate actual drop amount based on percentage
+        yearly_drop = current_efficiency * (percent_drop / 100)
+        yearly_drops.append(yearly_drop)
+
+        current_efficiency -= yearly_drop
+
+        if current_efficiency < 0:
+            current_efficiency = 0
+
+    while len(efficiency) < years:
+        efficiency.append(efficiency[-1])
+
+    return efficiency[:years], yearly_drops[:years], replace_year
 
 # Function to predict time until next failure based on parameters
-def predict_time_until_failure(flow_rate, threshold):
+def predict_time_until_failure(efficiency, threshold=50.0):
     """
-    Predicts the time until the pump's flow rate falls below the threshold.
-    
+    Predicts the time until the pump's efficiency falls below the threshold.
+
     Args:
-        flow_rate (list): List of flow rates over the years.
-        threshold (float): Flow rate threshold for failure (usgpm).
-    
+        efficiency (list): List of efficiencies over the years.
+        threshold (float): Efficiency threshold for failure (%). Defaults to 50.0.
+
     Returns:
         int: Years until failure.
     """
-    for year, rate in enumerate(flow_rate, start=1):
-        if rate <= threshold:
+    for year, eff in enumerate(efficiency, start=1):
+        if eff <= threshold:
             return year
-    return None  # If no failure occurs within the simulation period
+    return None
 
-# Create sidebar for input parameters
-st.sidebar.markdown("<h2 class='sub-header'>Simulation Parameters</h2>", unsafe_allow_html=True)
+# Sidebar for input parameters
+st.sidebar.header("Input Parameters")
 
-# Basic parameters
-with st.sidebar.expander("Basic Parameters", expanded=True):
-    years = st.slider("Simulation Period (Years)", min_value=1, max_value=30, value=15, step=1)
-    initial_flow_rate = st.number_input("Initial Pump Flow Rate (usgpm)", min_value=500.0, max_value=5000.0, value=2800.0, step=100.0)
-    threshold = st.number_input("Flow Rate Threshold for Failure (usgpm)", min_value=500.0, max_value=3000.0, value=1500.0, step=100.0)
-
-# Overhaul parameters
-with st.sidebar.expander("Overhaul Parameters", expanded=True):
-    overhaul_interval = st.slider("Interval Between Overhauls (Years)", min_value=1, max_value=10, value=5, step=1)
-    overhaul_drop = st.slider("Flow Rate Drop After Each Overhaul (%)", min_value=1.0, max_value=20.0, value=10.0, step=0.5)
-
-# Operational parameters
-with st.sidebar.expander("Operational Parameters", expanded=True):
-    particle_concentration = st.slider("Sand Particle Concentration (%)", min_value=0.0, max_value=20.0, value=10.0, step=0.5)
-    ph = st.slider("Average pH Level", min_value=1.0, max_value=14.0, value=8.0, step=0.1)
-
-# Main content area - split into two columns
-col1, col2 = st.columns([2, 1])
-
-# Calculate flow rate based on user inputs
-flow_rate = calculate_flow_rate(years, initial_flow_rate, overhaul_drop, overhaul_interval,
-                                particle_concentration, ph)
-
-# Create and display the plot in the first column
-with col1:
-    st.markdown("<h2 class='sub-header'>Flow Rate Decline Over Time</h2>", unsafe_allow_html=True)
+with st.sidebar.form("input_form"):
+    years = st.slider("Simulation Period (Years)", 1, 30, 10)
+    initial_efficiency = st.slider("Initial Pump Efficiency (%)", 50.0, 100.0, 85.0)
+    bep_ratio_drop = st.slider("BEP Ratio Drop After Overhaul (%)", 0.0, 20.0, 5.0)
+    threshold = st.slider("Efficiency Threshold for Overhaul (%)", 40.0, 80.0, 60.0)
     
-    fig, ax = plt.subplots(figsize=(10, 6))
-    ax.plot(range(1, years + 1), flow_rate, marker='o', linestyle='-', color='#1976D2', linewidth=2, markersize=6)
+    st.subheader("Operational Parameters")
+    particle_concentration = st.slider("Sand Particle Concentration in Fluid (%)", 0.0, 5.0, 1.0, 0.1)
+    ph = st.slider("Average pH Level of Fluid", 1.0, 14.0, 7.0, 0.1)
+    chloride_concentration = st.slider("Chloride Concentration (ppm)", 0.0, 5000.0, 1000.0, 100.0)
+    input_pressure = st.slider("Input Pressure of the Pump (psig)", 0.0, 1000.0, 200.0)
+    output_pressure = st.slider("Output Pressure of the Pump (psig)", 0.0, 1000.0, 400.0)
+    flow_rate = st.slider("Flow Rate of the Pump (usgpm)", 0.0, 10000.0, 2000.0)
     
-    # Mark overhaul years with vertical lines
-    for year in range(overhaul_interval, years + 1, overhaul_interval):
-        ax.axvline(x=year, color='red', linestyle='--', alpha=0.5)
-    
-    # Mark threshold
-    ax.axhline(y=threshold, color='red', linestyle='-', label=f"Failure Threshold ({threshold} usgpm)")
-    
-    ax.set_title("Pump Flow Rate Decline Over Time", fontsize=16)
-    ax.set_xlabel("Year", fontsize=12)
-    ax.set_ylabel("Flow Rate (usgpm)", fontsize=12)
-    ax.grid(True, alpha=0.3)
-    ax.set_xticks(range(1, years + 1, 1 if years <= 15 else 2))
-    ax.legend()
-    
-    st.pyplot(fig)
+    submit_button = st.form_submit_button(label="Calculate")
 
-    # Display data table
-    st.markdown("<h3 class='sub-header'>Year-by-Year Data</h3>", unsafe_allow_html=True)
-    df = pd.DataFrame({
-        'Year': range(1, years + 1),
-        'Flow Rate (usgpm)': [round(rate, 2) for rate in flow_rate],
-        'Overhaul Year': ['Yes' if year % overhaul_interval == 0 else 'No' for year in range(1, years + 1)]
-    })
-    st.dataframe(df, hide_index=True)
-
-# Results and analysis in the second column
-with col2:
-    st.markdown("<h2 class='sub-header'>Results & Analysis</h2>", unsafe_allow_html=True)
+if submit_button or 'efficiency' in st.session_state:
+    # Simulate efficiency decline and yearly drops
+    efficiency, yearly_drops, replace_year = calculate_efficiency_with_threshold(
+        years,
+        initial_efficiency,
+        bep_ratio_drop,
+        threshold,
+        particle_concentration,
+        ph,
+        chloride_concentration,
+        input_pressure,
+        output_pressure,
+        flow_rate,
+    )
     
-    # Calculate time until failure
-    time_until_failure = predict_time_until_failure(flow_rate, threshold)
+    # Store in session state
+    st.session_state.efficiency = efficiency
+    st.session_state.yearly_drops = yearly_drops
+    st.session_state.replace_year = replace_year
     
-    # Create a metrics container
-    st.markdown("### Key Metrics")
-    metric_col1, metric_col2 = st.columns(2)
+    # Create two columns
+    col1, col2 = st.columns([2, 1])
     
-    with metric_col1:
-        st.metric(
-            label="Initial Flow Rate",
-            value=f"{initial_flow_rate} usgpm"
-        )
+    with col1:
+        # Plot efficiency decline with a single threshold line
+        fig, ax = plt.subplots(figsize=(10, 6))
+        ax.plot(range(1, years + 1), efficiency[:years], marker='o', label="Efficiency (%)")
+        ax.axhline(y=threshold, color='r', linestyle='--', label=f"Overhaul Threshold ({threshold}%)")
         
-        st.metric(
-            label="Final Flow Rate",
-            value=f"{round(flow_rate[-1], 2)} usgpm",
-            delta=f"{round((flow_rate[-1] - initial_flow_rate) / initial_flow_rate * 100, 2)}%",
-            delta_color="inverse"
-        )
+        ax.set_title("Efficiency Decline Over Time with Operational Factors")
+        ax.set_xlabel("Year")
+        ax.set_ylabel("Efficiency (%)")
+        ax.set_xticks(range(1, years + 1, max(1, years // 10)))
+        ax.legend()
+        ax.grid(True)
+        
+        st.pyplot(fig)
     
-    with metric_col2:
-        # Display failure prediction
+    with col2:
+        # Predict time until next failure and overhaul
+        time_until_failure = predict_time_until_failure(efficiency, threshold)
+        
+        st.subheader("Analysis Results")
+        
         if time_until_failure:
-            st.metric(
-                label="Time Until Failure",
-                value=f"{time_until_failure} years"
-            )
+            st.info(f"Time until next overhaul (below {threshold}%): {time_until_failure} years")
         else:
-            st.metric(
-                label="Time Until Failure",
-                value="No failure detected"
-            )
+            st.success(f"No overhaul needed within the simulation period.")
         
-        # Total flow rate drop
-        st.metric(
-            label="Total Flow Rate Drop",
-            value=f"{round(100 - (flow_rate[-1] / initial_flow_rate * 100), 2)}%"
-        )
+        # Predict when pump should be replaced
+        if replace_year:
+            st.error(f"Pump should be replaced at year: {replace_year}")
+        else:
+            st.success("Pump does not need replacement within the simulation period.")
     
-    # Show efficiency impact factors
-    # st.markdown("### Efficiency Impact Factors")
+    # Display yearly drops in efficiency as a dataframe
+    st.subheader("Yearly Efficiency Analysis")
     
-    # # Calculate impact percentages
-    # particle_impact = particle_concentration * 0.005 * 100
-    # ph_impact = abs(7 - ph) * 0.01 * 100
+    # Create a DataFrame for the results
+    data = {
+        "Year": list(range(1, len(efficiency) + 1)),
+        "Efficiency (%)": [round(eff, 2) for eff in efficiency],
+        "Yearly Drop (%)": [round(drop, 2) for drop in yearly_drops] if yearly_drops else []
+    }
     
-    # # Create a horizontal bar chart for impact factors
-    # impact_data = {
-    #     'Factor': ['Sand Particles', 'pH Deviation'],
-    #     'Impact (% per year)': [particle_impact, ph_impact]
-    # }
-    # impact_df = pd.DataFrame(impact_data)
+    # Add empty values if lengths don't match
+    max_len = max(len(data["Year"]), len(data["Efficiency (%)"]), len(data["Yearly Drop (%)"]))
+    for key in data:
+        while len(data[key]) < max_len:
+            data[key].append(None)
     
-    # fig, ax = plt.subplots(figsize=(8, 3))
-    # bars = ax.barh(impact_df['Factor'], impact_df['Impact (% per year)'], color=['#FFA726', '#42A5F5'])
-    # ax.set_xlabel('Efficiency Impact (% per year)')
-    # ax.grid(axis='x', alpha=0.3)
+    df = pd.DataFrame(data)
+    st.dataframe(df, use_container_width=True)
     
-    # # Add value labels to bars
-    # for bar in bars:
-    #     width = bar.get_width()
-    #     ax.text(width + 0.1, bar.get_y() + bar.get_height()/2, f'{width:.2f}%', 
-    #             va='center', fontsize=10)
+    # Display a download button for the data
+    csv = df.to_csv(index=False).encode('utf-8')
+    st.download_button(
+        label="Download Results as CSV",
+        data=csv,
+        file_name="pump_efficiency_analysis.csv",
+        mime="text/csv",
+    )
     
-    # st.pyplot(fig)
+    # Display input parameters for reference
+    st.subheader("Input Parameters Summary")
     
-    # Recommendations section
-    # st.markdown("### Recommendations")
+    params_data = {
+        "Parameter": [
+            "Initial Efficiency", 
+            "BEP Ratio Drop After Overhaul", 
+            "Threshold for Overhaul",
+            "Sand Particle Concentration", 
+            "pH Level", 
+            "Chloride Concentration",
+            "Input Pressure", 
+            "Output Pressure", 
+            "Flow Rate"
+        ],
+        "Value": [
+            f"{initial_efficiency}%",
+            f"{bep_ratio_drop}%",
+            f"{threshold}%",
+            f"{particle_concentration}%",
+            f"{ph}",
+            f"{chloride_concentration} ppm",
+            f"{input_pressure} psig",
+            f"{output_pressure} psig",
+            f"{flow_rate} usgpm"
+        ]
+    }
     
-    # if time_until_failure and time_until_failure < years:
-    #     st.warning(f"⚠️ Pump will reach failure threshold in year {time_until_failure}. Consider the following actions:")
-    #     if overhaul_interval > 2:
-    #         st.info(f"🔧 Decreasing overhaul interval from {overhaul_interval} to {max(1, overhaul_interval - 2)} years may extend pump life.")
-    # else:
-    #     st.success("✅ Pump is projected to maintain adequate flow throughout the simulation period.")
-    
-    # # Display operational insights
-    # if particle_concentration > 5:
-    #     st.info(f"🔍 High sand particle concentration ({particle_concentration}%) is significantly impacting pump life.")
-    
-    # if abs(7 - ph) > 2:
-    #     st.info(f"🔍 pH level of {ph} deviates significantly from neutral (7.0), accelerating degradation.")
+    st.table(pd.DataFrame(params_data))
 
-# Add download capability for the results
-csv = df.to_csv(index=False).encode('utf-8')
-st.download_button(
-    label="Download Data as CSV",
-    data=csv,
-    file_name="pump_flow_rate_simulation.csv",
-    mime="text/csv",
-)
+# Add footer
+st.markdown("---")
+st.markdown("© 2025 Wip Performance Calculator | All Rights Reserved")

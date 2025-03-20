@@ -106,18 +106,18 @@ def predict_time_until_failure(efficiency, threshold=50.0):
 st.sidebar.header("Input Parameters")
 
 with st.sidebar.form("input_form"):
-    years = st.slider("Simulation Period (Years)", 1, 30, 10)
-    initial_efficiency = st.slider("Initial Pump Efficiency (%)", 50.0, 100.0, 85.0)
-    bep_ratio_drop = st.slider("BEP Ratio Drop After Overhaul (%)", 0.0, 20.0, 5.0)
-    threshold = st.slider("Efficiency Threshold for Overhaul (%)", 40.0, 80.0, 60.0)
+    years = st.number_input("Simulation Period (Years)", min_value=1, max_value=35, value=10, step=1)
+    initial_efficiency = st.number_input("Initial Pump Efficiency (%)", min_value=0.0, max_value=100.0, value=85.0, step=0.1)
+    bep_ratio_drop = st.number_input("BEP Ratio Drop After Overhaul (%)", min_value=0.0, max_value=50.0, value=5.0, step=0.1)
+    threshold = st.number_input("Efficiency Threshold for Overhaul (%)", min_value=0.0, max_value=100.0, value=60.0, step=0.1)
     
     st.subheader("Operational Parameters")
-    particle_concentration = st.slider("Sand Particle Concentration in Fluid (%)", 0.0, 5.0, 1.0, 0.1)
-    ph = st.slider("Average pH Level of Fluid", 1.0, 14.0, 7.0, 0.1)
-    chloride_concentration = st.slider("Chloride Concentration (ppm)", 0.0, 5000.0, 1000.0, 100.0)
-    input_pressure = st.slider("Input Pressure of the Pump (psig)", 0.0, 1000.0, 200.0)
-    output_pressure = st.slider("Output Pressure of the Pump (psig)", 0.0, 1000.0, 400.0)
-    flow_rate = st.slider("Flow Rate of the Pump (usgpm)", 0.0, 10000.0, 2000.0)
+    particle_concentration = st.number_input("Sand Particle Concentration in Fluid (%)", min_value=0.0, max_value=50.0, value=1.0, step=0.1)
+    ph = st.number_input("Average pH Level of Fluid", min_value=0.0, max_value=14.0, value=7.0, step=0.1)
+    chloride_concentration = st.number_input("Chloride Concentration (ppm)", min_value=0.0, max_value=1500.0, value=1000.0, step=100.0)
+    input_pressure = st.number_input("Input Pressure of the Pump (psig)", min_value=0.0, max_value=5000.0, value=200.0, step=10.0)
+    output_pressure = st.number_input("Output Pressure of the Pump (psig)", min_value=0.0, max_value=5000.0, value=400.0, step=10.0)
+    flow_rate = st.number_input("Flow Rate of the Pump (usgpm)", min_value=0.0, max_value=4000.0, value=2000.0, step=100.0)
     
     submit_button = st.form_submit_button(label="Calculate")
 
@@ -153,7 +153,7 @@ if submit_button or 'efficiency' in st.session_state:
         ax.set_title("Efficiency Decline Over Time with Operational Factors")
         ax.set_xlabel("Year")
         ax.set_ylabel("Efficiency (%)")
-        ax.set_xticks(range(1, years + 1, max(1, years // 10)))
+        ax.set_xticks(range(1, years + 1, 1))
         ax.legend()
         ax.grid(True)
         
